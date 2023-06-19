@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "hometask-08"
+version = "0.1.0"
+description = ""
+authors = ["Oleksii Petrashov <oleksii.petrashov@gmail.com>"]
+readme = "README.md"
+packages = []
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4"
+pymongo = {extras = ["srv", "tls"], version = "^4.3.3"}
+mongoengine = "^0.27.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
