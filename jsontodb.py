@@ -58,7 +58,7 @@ def export_authors():
             except mongoengine.NotUniqueError:
                 logging.info("The author exists.")
 
-    logging.info(f"Authors count saved to DB: {successfully_saved}")
+    print(f"Authors count saved to DB: {successfully_saved}")
 
 
 def export_quotes():
@@ -73,7 +73,7 @@ def export_quotes():
             except mongoengine.NotUniqueError:
                 logging.info("The quote exists.")
 
-    logging.info(f"Quotes count saved to DB: {successfully_saved}")
+    print(f"Quotes count saved to DB: {successfully_saved}")
 
 
 def export_data():
