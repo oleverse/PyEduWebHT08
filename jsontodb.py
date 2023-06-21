@@ -1,11 +1,16 @@
+import mongoengine
+
 import connect
 import json
 import logging
 from pathlib import Path
 
 import models
+from locale import setlocale, LC_ALL
+from datetime import datetime
 
-logging.basicConfig(level=logging.INFO & logging.DEBUG)
+
+setlocale(LC_ALL, 'en_US.UTF-8')
 
 
 def get_json_object(file_path: Path):
@@ -20,40 +25,57 @@ def get_json_object(file_path: Path):
         return json_obj
 
 
-def get_authors():
+def authors_from_json():
     if json_data := get_json_object(Path('data/authors.json')):
-
         authors = []
         for author_json in json_data:
-            authors.append(models.Author(author_json))
+            author_json["born_date"] = datetime.strptime(author_json["born_date"], "%B %d, %Y").date().isoformat()
+            authors.append(models.Authors.from_json(json.dumps(author_json)))
 
         return authors
 
 
-def get_quotes():
+def get_quotes(authors):
     if json_data := get_json_object(Path('data/quotes.json')):
-
         quotes = []
         for quote_json in json_data:
-            quotes.append(models.Quote(quote_json))
+            quote_model = models.Quotes.from_json(json.dumps(quote_json))
+            quote_model.author = list(filter(lambda a: a.fullname == quote_json["author"], authors))[0]
+            quotes.append(quote_model)
 
         return quotes
 
 
-def map_quotes_to_authors(authors, quotes):
-    for quote in quotes:
-        quote.author = list(filter(lambda a: a.fullname == quote.author, authors))[0]
+def export_authors():
+    json_authors = authors_from_json()
+    successfully_saved = 0
+
+    if json_authors:
+        for author in json_authors:
+            try:
+                author.save()
+                successfully_saved += 1
+            except mongoengine.NotUniqueError:
+                logging.info("The author exists.")
+
+    logging.info(f"Authors count saved to DB: {successfully_saved}")
+
+
+def export_quotes():
+    db_authors = [a for a in models.Authors.objects()]
+    successfully_saved = 0
+
+    if quotes := get_quotes(db_authors):
+        for quote in quotes:
+            try:
+                quote.save()
+                successfully_saved += 1
+            except mongoengine.NotUniqueError:
+                logging.info("The quote exists.")
+
+    logging.info(f"Quotes count saved to DB: {successfully_saved}")
 
 
 def export_data():
-    authors = get_authors()
-    quotes = get_quotes()
-
-    if authors and quotes:
-        map_quotes_to_authors(authors, quotes)
-        [a.save() for a in authors]
-        logging.info("List of authors saved to DB.")
-        [q.save() for q in quotes]
-        logging.info("List of quotes saved to DB.")
-    else:
-        logging.info(f'Not enough data for export!')
+    export_authors()
+    export_quotes()
