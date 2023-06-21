@@ -1,15 +1,22 @@
+import json
 import logging
 import re
 
 import models
+from connect import redis_cache
 
 
 def get_quotes_by_name(name):
     if not name:
         logging.info("Name is not set!")
     else:
-        query_pattern = re.compile(rf'.*{name}.*', re.I)
-        authors = [a.id for a in models.Authors.objects(fullname=query_pattern)]
+        # two ways of regex search:
+        # case-insesitive with python re
+        #   query_pattern = re.compile(rf'.*{name}.*', re.I)
+        #   authors = [a.id for a in models.Authors.objects(fullname=query_pattern)]
+        # OR
+        #   case-sensitive with $regex Mongo modifier
+        authors = [a.id for a in models.Authors.objects(fullname__regex=name)]
         if authors:
             return [q.quote for q in models.Quotes.objects(author__in=authors)]
 
@@ -40,13 +47,29 @@ KEYWORD_ACTIONS = {
 
 def do_search(query: str):
     try:
-        keyword, params = re.split(r':\s*', query, maxsplit=1)
+        keyword, params = re.split(r'\s*:\s*', query, maxsplit=1)
+        keyword = keyword.strip().lower()
+        if keyword not in KEYWORD_ACTIONS:
+            raise ValueError
+        params = params.strip()
     except ValueError:
         print("Bad query!")
     else:
-        results = KEYWORD_ACTIONS[keyword.strip().lower()](params.strip())
+        is_from_redis = False
+
+        if not (results := redis_cache.get(f'{keyword}: {params}')):
+            results = KEYWORD_ACTIONS[keyword](params)
+        else:
+            logging.info("Found in Redis cache!")
+            is_from_redis = True
+            results = json.loads(results)
 
         if results:
+            if not is_from_redis:
+                # save for 5 minutes
+                redis_cache.set(f'{keyword}: {params}', json.dumps(results), ex=300)
+                logging.info("Saved to Redis cache.")
+
             print(f'Results for query "{query}":\n\t', end='')
             print(*results, sep='\n\t')
         else:
@@ -56,7 +79,7 @@ def do_search(query: str):
 def search_shell():
     try:
         if logging.getLogger().level == logging.DEBUG:
-            do_search("tag: life, success")
+            do_search("tags: life, deep")
         else:
             while (query := input(f'Enter search query: ').strip()).lower() != 'exit':
                 do_search(query)
