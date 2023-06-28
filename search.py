@@ -18,7 +18,7 @@ def get_quotes_by_name(name):
         #   case-insensitive with $regex Mongo modifier
         authors = [a.id for a in models.Authors.objects(fullname__iregex=name)]
         if authors:
-            return [q.quote for q in models.Quotes.objects(author__in=authors)]
+            return [f'{q.quote} ({q.author.fullname})' for q in models.Quotes.objects(author__in=authors)]
 
 
 def get_quotes_by_tags(tags_string):
@@ -27,7 +27,7 @@ def get_quotes_by_tags(tags_string):
     if not tags_list:
         logging.info("Tag(s) not set!")
     else:
-        return [q.quote for q in models.Quotes.objects(tags__in=tags_list)]
+        return [f'{q.quote} ({q.author.fullname})' for q in models.Quotes.objects(tags__in=tags_list)]
 
 
 def get_quotes_by_tag(tag_string: str):
